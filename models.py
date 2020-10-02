@@ -3,11 +3,6 @@ from sqlalchemy.orm import sessionmaker, relationship
 from sqlalchemy import Column, ForeignKey, ForeignKeyConstraint, UniqueConstraint, CHAR, VARCHAR, JSON, SMALLINT, INTEGER, DATE, BOOLEAN, TIMESTAMP, TIME, ARRAY
 from sqlalchemy.ext.declarative import declarative_base
 
-engine = sqlalchemy.create_engine("postgresql+psycopg2://user:@/ironswallow_evelyn")
-
-Session = sessionmaker()
-Session.configure(bind=engine)
-session = Session()
 
 Base = declarative_base()
 
@@ -73,8 +68,11 @@ class DarwinSchedule(Base):
 
     uid_ssd_unique_constraint = UniqueConstraint("uid", "ssd")
 
+    locations = relationship("DarwinScheduleLocation")
+
     def __repr__(self):
-        return "<DarwinSchedule {}/{} ({}) {} {}>".format(self.ssd, self.uid, self.rid, self.signalling_id, self.operator)
+        #return "<DarwinSchedule {}/{} ({}) {} {}\n{}\n>".format(self.ssd, self.uid, self.rid, self.signalling_id, self.operator, self.locations)
+        return "{}/{} (r. {} rs. {}) {}".format(self.ssd, self.uid, self.rid, self.rid, self.rsid, self.operator_id)
 
 
 class DarwinAssociation(Base):
@@ -119,6 +117,7 @@ class DarwinAssociation(Base):
 
 class DarwinScheduleLocation(Base):
     __tablename__ = "darwin_schedule_locations"
+
     rid = Column(CHAR(15), ForeignKey("darwin_schedules.rid"), nullable=False, primary_key=True)
     rid_constraint = ForeignKeyConstraint(("rid",), ("darwin_schedules.rid",), ondelete="CASCADE")
     schedule = relationship("DarwinSchedule")
@@ -132,15 +131,6 @@ class DarwinScheduleLocation(Base):
     activity = Column(VARCHAR(12), nullable=False)
     original_wt = Column(VARCHAR(18))
 
-    # fkey_rid_owt_m = ForeignKeyConstraint(
-    #     (rid, original_wt),
-    #     ("darwin_associations.main_rid", "darwin_associations.main_original_wt")
-    # )
-    # fkey_rid_owt_a = ForeignKeyConstraint(
-    #     (rid, original_wt),
-    #     ("darwin_associations.assoc_rid", "darwin_associations.assoc_original_wt")
-    # )
-
     pta = Column(TIMESTAMP, default=None)
     wta = Column(TIMESTAMP, default=None, index=True)
     wtp = Column(TIMESTAMP, default=None, index=True)
@@ -152,8 +142,11 @@ class DarwinScheduleLocation(Base):
 
     status = relationship("DarwinScheduleStatus", uselist=False)
 
+    associated_to = relationship("DarwinAssociation", primaryjoin="and_(foreign(DarwinScheduleLocation.rid)==DarwinAssociation.main_rid, foreign(DarwinScheduleLocation.original_wt)==DarwinAssociation.main_original_wt)")
+    associated_from = relationship("DarwinAssociation", primaryjoin="and_(foreign(DarwinScheduleLocation.rid)==DarwinAssociation.assoc_rid, foreign(DarwinScheduleLocation.original_wt)==DarwinAssociation.assoc_original_wt)")
+
     def __repr__(self):
-        return "<DarwinScheduleLocation {}/{}/{} wta {} wtd {} s {}>".format(self.rid, self.tiploc, self.index, self.wta, self.wtd, self.status)
+        return "<DarwinScheduleLocation {}/{}/{} wta {} wtd {} s {} f {} t{}>".format(self.rid, self.tiploc, self.index, self.wta, self.wtd, self.status, self.associated_from, self.associated_to)
 
 
 class DarwinScheduleStatus(Base):
@@ -211,3 +204,11 @@ class DarwinMessage(Base):
     suppress = Column(BOOLEAN, nullable=False)
     stations = Column(ARRAY(VARCHAR(3)), nullable=False, index=True)
     message = Column(VARCHAR, nullable=False)
+
+
+class LastReceivedSequence(Base):
+    __tablename__ = "last_received_sequence"
+    id = Column(SMALLINT, nullable=False, unique=True, primary_key=True)
+    sequence = Column(INTEGER, nullable=False)
+    time_acquired = Column(TIMESTAMP, nullable=False)
+
