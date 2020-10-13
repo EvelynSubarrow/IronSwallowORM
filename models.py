@@ -68,7 +68,11 @@ class DarwinSchedule(Base):
 
     uid_ssd_unique_constraint = UniqueConstraint("uid", "ssd")
 
-    locations = relationship("DarwinScheduleLocation")
+    locations = relationship("DarwinScheduleLocation", lazy="select", primaryjoin="foreign(DarwinSchedule.rid)==DarwinScheduleLocation.rid")
+
+    origins_rel = relationship("DarwinScheduleLocation", lazy="joined", primaryjoin="and_(foreign(DarwinSchedule.rid)==DarwinScheduleLocation.rid, DarwinScheduleLocation.loc_type.like('%OR'))")
+    destinations_rel = relationship("DarwinScheduleLocation", lazy="joined", primaryjoin="and_(foreign(DarwinSchedule.rid)==DarwinScheduleLocation.rid, DarwinScheduleLocation.loc_type.like('%DT'))")
+
 
     def __repr__(self):
         #return "<DarwinSchedule {}/{} ({}) {} {}\n{}\n>".format(self.ssd, self.uid, self.rid, self.signalling_id, self.operator, self.locations)
@@ -80,7 +84,7 @@ class DarwinAssociation(Base):
 
     category = Column(CHAR(2), nullable=False)
     tiploc = Column(VARCHAR(3), ForeignKey("darwin_locations.tiploc"), nullable=False, index=True, primary_key=True)
-    location = relationship("DarwinLocation", uselist=False)
+    location = relationship("DarwinLocation", uselist=False, lazy="select")
 
     # main
 
@@ -120,7 +124,7 @@ class DarwinScheduleLocation(Base):
 
     rid = Column(CHAR(15), ForeignKey("darwin_schedules.rid"), nullable=False, primary_key=True)
     rid_constraint = ForeignKeyConstraint(("rid",), ("darwin_schedules.rid",), ondelete="CASCADE")
-    schedule = relationship("DarwinSchedule")
+    schedule = relationship("DarwinSchedule", uselist=False, lazy="joined", innerjoin=True)
 
     index = Column(SMALLINT, primary_key=True)
     loc_type = Column(VARCHAR(4), nullable=False, name="type")
@@ -140,13 +144,13 @@ class DarwinScheduleLocation(Base):
     cancelled = Column(BOOLEAN, nullable=False, default=False)
     rdelay = Column(SMALLINT, nullable=False, default=0)
 
-    status = relationship("DarwinScheduleStatus", uselist=False)
+    status = relationship("DarwinScheduleStatus", uselist=False, lazy="joined", innerjoin=True)
 
-    associated_to = relationship("DarwinAssociation", primaryjoin="and_(foreign(DarwinScheduleLocation.rid)==DarwinAssociation.main_rid, foreign(DarwinScheduleLocation.original_wt)==DarwinAssociation.main_original_wt)")
-    associated_from = relationship("DarwinAssociation", primaryjoin="and_(foreign(DarwinScheduleLocation.rid)==DarwinAssociation.assoc_rid, foreign(DarwinScheduleLocation.original_wt)==DarwinAssociation.assoc_original_wt)")
+    associated_to = relationship("DarwinAssociation", lazy="joined", primaryjoin="and_(foreign(DarwinScheduleLocation.rid)==DarwinAssociation.main_rid, foreign(DarwinScheduleLocation.original_wt)==DarwinAssociation.main_original_wt)")
+    associated_from = relationship("DarwinAssociation", lazy="joined", primaryjoin="and_(foreign(DarwinScheduleLocation.rid)==DarwinAssociation.assoc_rid, foreign(DarwinScheduleLocation.original_wt)==DarwinAssociation.assoc_original_wt)")
 
     def __repr__(self):
-        return "<DarwinScheduleLocation {}/{}/{} wta {} wtd {} s {} f {} t{}>".format(self.rid, self.tiploc, self.index, self.wta, self.wtd, self.status, self.associated_from, self.associated_to)
+        return "<DarwinScheduleLocation {}/{}/{} wta {} wtd {} s {} f - t ->".format(self.rid, self.tiploc, self.index, self.wta, self.wtd, self.status)
 
 
 class DarwinScheduleStatus(Base):
