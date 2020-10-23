@@ -1,7 +1,35 @@
+from collections import OrderedDict
+import datetime
+from decimal import Decimal
+
+
 import sqlalchemy
 from sqlalchemy.orm import sessionmaker, relationship
 from sqlalchemy import Column, ForeignKey, ForeignKeyConstraint, UniqueConstraint, CHAR, VARCHAR, JSON, SMALLINT, INTEGER, DATE, BOOLEAN, TIMESTAMP, TIME, ARRAY
 from sqlalchemy.ext.declarative import declarative_base
+
+
+def _compare_time(t1, t2) -> int:
+    if not (t1 and t2):
+        return 0
+    t1,t2 = [a.hour*3600+a.minute*60+a.second for a in (t1,t2)]
+    return (Decimal(t1)-Decimal(t2))/3600
+
+def _combine_darwin_time(working_time, darwin_time) -> datetime.datetime:
+    if not working_time or not darwin_time:
+        return None
+
+    # Crossed midnight, increment ssd offset
+    if _compare_time(darwin_time, working_time) < -6:
+        ssd_offset = +1
+    # Normal increase or decrease, nothing we really need to do here
+    elif -6 <= _compare_time(darwin_time, working_time) <= +18:
+        ssd_offset = 0
+    # Back in time, crossed midnight (in reverse), decrement ssd offset
+    elif +18 < _compare_time(darwin_time, working_time):
+        ssd_offset = -1
+
+    return datetime.datetime.combine(working_time.date(), darwin_time) + datetime.timedelta(days=ssd_offset)
 
 
 Base = declarative_base()
@@ -40,6 +68,14 @@ class DarwinLocation(Base):
     def __repr__(self):
         return "<DarwinLocation {} - {}>".format(self.tiploc, self.name_short)
 
+    def serialise(self, short=True):
+        return OrderedDict([
+            ("tiploc", self.tiploc),
+            ("crs_darwin", self.crs_darwin),
+            ("name_short", self.name_short),
+            ("name_full", self.name_full),
+        ])
+
 
 class DarwinSchedule(Base):
     __tablename__ = "darwin_schedules"
@@ -70,13 +106,125 @@ class DarwinSchedule(Base):
 
     locations = relationship("DarwinScheduleLocation", lazy="select", primaryjoin="foreign(DarwinSchedule.rid)==DarwinScheduleLocation.rid")
 
-    origins_rel = relationship("DarwinScheduleLocation", lazy="joined", primaryjoin="and_(foreign(DarwinSchedule.rid)==DarwinScheduleLocation.rid, DarwinScheduleLocation.loc_type.like('%OR'))")
-    destinations_rel = relationship("DarwinScheduleLocation", lazy="joined", primaryjoin="and_(foreign(DarwinSchedule.rid)==DarwinScheduleLocation.rid, DarwinScheduleLocation.loc_type.like('%DT'))")
+    origins_rel = relationship("DarwinScheduleLocation", uselist=True, lazy="joined", primaryjoin="and_(foreign(DarwinSchedule.rid)==DarwinScheduleLocation.rid, DarwinScheduleLocation.loc_type.like('%OR'))")
+    destinations_rel = relationship("DarwinScheduleLocation", uselist=True, lazy="joined", primaryjoin="and_(foreign(DarwinSchedule.rid)==DarwinScheduleLocation.rid, DarwinScheduleLocation.loc_type.like('%DT'))")
+
+
+    associated_to = relationship("DarwinAssociation", uselist=True, lazy="joined", primaryjoin="foreign(DarwinSchedule.rid)==DarwinAssociation.main_rid")
+    associated_from = relationship("DarwinAssociation", uselist=True, lazy="joined", primaryjoin="foreign(DarwinSchedule.rid)==DarwinAssociation.assoc_rid")
 
 
     def __repr__(self):
-        #return "<DarwinSchedule {}/{} ({}) {} {}\n{}\n>".format(self.ssd, self.uid, self.rid, self.signalling_id, self.operator, self.locations)
         return "{}/{} (r. {} rs. {}) {}".format(self.ssd, self.uid, self.rid, self.rid, self.rsid, self.operator_id)
+
+
+    def serialise(self, recurse):
+        """For JSONification. Recurse - if set to True, will include all calling locations"""
+        return OrderedDict([
+            ("uid", self.uid),
+            ("ssd", self.ssd),
+            ("rid", self.rid),
+            ("rsid", self.rsid),
+            ("signalling_id", self.signalling_id),
+            ("is_active", self.is_active),
+            ("is_charter", self.is_charter),
+            ("is_passenger", self.is_passenger),
+            ("origins", [a.serialise(False) for a in self.get_origins()]),
+            ("destinations", [a.serialise(False) for a in self.get_destinations()]),
+            ("delay_reason", self.delay_reason),
+            ("cancel_reason", self.cancel_reason),
+        ])
+
+    # TODO: These need to offer the source of the location
+
+    def get_origins(self):
+        return self.origins_rel + [b for a in self.associated_from for b in a.main_schedule.origins_rel]
+
+    def get_destinations(self):
+        return self.destinations_rel + [b for a in self.associated_to for b in a.assoc_schedule.destinations_rel]
+
+
+class DarwinScheduleLocation(Base):
+    __tablename__ = "darwin_schedule_locations"
+
+    rid = Column(CHAR(15), ForeignKey("darwin_schedules.rid"), nullable=False, primary_key=True)
+    rid_constraint = ForeignKeyConstraint(("rid",), ("darwin_schedules.rid",), ondelete="CASCADE")
+    schedule = relationship("DarwinSchedule", uselist=False, lazy="joined", innerjoin=True)
+
+    index = Column(SMALLINT, primary_key=True)
+    loc_type = Column(VARCHAR(4), nullable=False, name="type")
+
+    tiploc = Column(VARCHAR(7), ForeignKey("darwin_locations.tiploc"), nullable=False, index=True)
+    location: DarwinLocation = relationship("DarwinLocation", uselist=False)
+
+    activity = Column(VARCHAR(12), nullable=False)
+    original_wt = Column(VARCHAR(18))
+
+    pta = Column(TIMESTAMP, default=None)
+    wta = Column(TIMESTAMP, default=None, index=True)
+    wtp = Column(TIMESTAMP, default=None, index=True)
+    ptd = Column(TIMESTAMP, default=None)
+    wtd = Column(TIMESTAMP, default=None, index=True)
+
+    cancelled = Column(BOOLEAN, nullable=False, default=False)
+    rdelay = Column(SMALLINT, nullable=False, default=0)
+
+    status: "DarwinScheduleStatus" = relationship("DarwinScheduleStatus", uselist=False, lazy="joined", innerjoin=True)
+
+    associated_to = relationship("DarwinAssociation", lazy="joined", primaryjoin="and_(foreign(DarwinScheduleLocation.rid)==DarwinAssociation.main_rid, foreign(DarwinScheduleLocation.original_wt)==DarwinAssociation.main_original_wt)")
+    associated_from = relationship("DarwinAssociation", lazy="joined", primaryjoin="and_(foreign(DarwinScheduleLocation.rid)==DarwinAssociation.assoc_rid, foreign(DarwinScheduleLocation.original_wt)==DarwinAssociation.assoc_original_wt)")
+
+
+    def complete_times_dict(self) -> dict:
+        out = OrderedDict()
+        for letter, name in zip("apd", ["arrival", "pass", "departure"]):
+            this_times = OrderedDict()
+
+            wt = getattr(self, "wt%s" % letter)
+            if wt:
+                this_times["working"] = wt
+
+            pt = getattr(self, "pt%s" % letter, None)
+            if pt:
+                this_times["public"] = pt
+
+            st = _combine_darwin_time(wt, getattr(self.status, "t%s" % letter))
+            stt = getattr(self.status, "t%s_type" % letter)
+            if st and stt:
+                this_times["actual"*(stt=="A") or "estimated"] = st
+
+            out[name] = this_times
+
+        return out
+
+    def __repr__(self):
+        return "<DarwinScheduleLocation {}/{}/{} wta {} wtd {} s {} f - t ->".format(self.rid, self.tiploc, self.index, self.wta, self.wtd, self.status)
+
+    def serialise(self, recurse: bool):
+        """Serialises this as a dict for presumed JSON. If recurse is set, will be enveloped by schedule"""
+        # TODO: enveloping is the old paradigm, but *is it a good one*? Semantically it doesn't make so much sense now
+        here = OrderedDict([
+            ("type", self.loc_type),
+            ("activity", self.activity),
+            ("cancelled", self.cancelled),
+            ("length", self.status.length),
+            ("times", self.complete_times_dict()),
+            ("platform", OrderedDict([
+                ("platform", self.status.plat),
+                ("suppressed", self.status.plat_suppressed),
+                ("cis_suppressed", self.status.plat_cis_suppressed),
+                ("confirmed", self.status.plat_confirmed),
+                ("source", self.status.plat_source)
+                ]))
+            ])
+        here.update(self.location.serialise(True))
+
+        if not recurse:
+            return here
+        else:
+            schedule = self.schedule.serialise(not recurse)
+            schedule["here"] = here
+            return schedule
 
 
 class DarwinAssociation(Base):
@@ -109,7 +257,7 @@ class DarwinAssociation(Base):
     assoc_original_wt = Column(VARCHAR(13), nullable=False, index=True, primary_key=True)
     unique_assoc_rid_owt = UniqueConstraint("assoc_rid", "assoc_original_wt")
 
-    associated_schedule = relationship("DarwinSchedule", foreign_keys=(assoc_rid,), uselist=False)
+    assoc_schedule = relationship("DarwinSchedule", foreign_keys=(assoc_rid,), uselist=False)
 
     # TODO: more foreign key tomfuckery
     fkey_assoc_schedule_loc = ForeignKeyConstraint(
@@ -117,40 +265,6 @@ class DarwinAssociation(Base):
         ("darwin_schedule_locations.rid", "darwin_schedule_locations.original_wt")
     )
     assoc_schedule_loc = relationship("DarwinScheduleLocation", foreign_keys=(main_rid, main_original_wt), viewonly=True)
-
-
-class DarwinScheduleLocation(Base):
-    __tablename__ = "darwin_schedule_locations"
-
-    rid = Column(CHAR(15), ForeignKey("darwin_schedules.rid"), nullable=False, primary_key=True)
-    rid_constraint = ForeignKeyConstraint(("rid",), ("darwin_schedules.rid",), ondelete="CASCADE")
-    schedule = relationship("DarwinSchedule", uselist=False, lazy="joined", innerjoin=True)
-
-    index = Column(SMALLINT, primary_key=True)
-    loc_type = Column(VARCHAR(4), nullable=False, name="type")
-
-    tiploc = Column(VARCHAR(7), ForeignKey("darwin_locations.tiploc"), nullable=False, index=True)
-    location = relationship("DarwinLocation", uselist=False)
-
-    activity = Column(VARCHAR(12), nullable=False)
-    original_wt = Column(VARCHAR(18))
-
-    pta = Column(TIMESTAMP, default=None)
-    wta = Column(TIMESTAMP, default=None, index=True)
-    wtp = Column(TIMESTAMP, default=None, index=True)
-    ptd = Column(TIMESTAMP, default=None)
-    wtd = Column(TIMESTAMP, default=None, index=True)
-
-    cancelled = Column(BOOLEAN, nullable=False, default=False)
-    rdelay = Column(SMALLINT, nullable=False, default=0)
-
-    status = relationship("DarwinScheduleStatus", uselist=False, lazy="joined", innerjoin=True)
-
-    associated_to = relationship("DarwinAssociation", lazy="joined", primaryjoin="and_(foreign(DarwinScheduleLocation.rid)==DarwinAssociation.main_rid, foreign(DarwinScheduleLocation.original_wt)==DarwinAssociation.main_original_wt)")
-    associated_from = relationship("DarwinAssociation", lazy="joined", primaryjoin="and_(foreign(DarwinScheduleLocation.rid)==DarwinAssociation.assoc_rid, foreign(DarwinScheduleLocation.original_wt)==DarwinAssociation.assoc_original_wt)")
-
-    def __repr__(self):
-        return "<DarwinScheduleLocation {}/{}/{} wta {} wtd {} s {} f - t ->".format(self.rid, self.tiploc, self.index, self.wta, self.wtd, self.status)
 
 
 class DarwinScheduleStatus(Base):
@@ -208,6 +322,16 @@ class DarwinMessage(Base):
     suppress = Column(BOOLEAN, nullable=False)
     stations = Column(ARRAY(VARCHAR(3)), nullable=False, index=True)
     message = Column(VARCHAR, nullable=False)
+
+    def serialise(self, recurse=False):
+        return OrderedDict([
+            ("id", self.message_id),
+            ("category", self.category),
+            ("severity", self.severity),
+            ("suppress", self.suppress),
+            ("stations", self.stations),
+            ("message", self.message)
+        ])
 
 
 class LastReceivedSequence(Base):
