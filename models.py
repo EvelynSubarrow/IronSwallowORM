@@ -126,6 +126,8 @@ class DarwinSchedule(Base):
             ("rid", self.rid),
             ("rsid", self.rsid),
             ("signalling_id", self.signalling_id),
+            ("category", self.category),
+            ("operator", self.operator_id),
             ("is_active", self.is_active),
             ("is_charter", self.is_charter),
             ("is_passenger", self.is_passenger),
