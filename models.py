@@ -1,7 +1,7 @@
 from collections import OrderedDict
 import datetime
 from decimal import Decimal
-
+from typing import Optional
 
 import sqlalchemy
 from sqlalchemy.orm import sessionmaker, relationship
@@ -104,7 +104,7 @@ class DarwinSchedule(Base):
 
     uid_ssd_unique_constraint = UniqueConstraint("uid", "ssd")
 
-    locations = relationship("DarwinScheduleLocation", lazy="select", primaryjoin="foreign(DarwinSchedule.rid)==DarwinScheduleLocation.rid")
+    locations = relationship("DarwinScheduleLocation", lazy="select", uselist=True, primaryjoin="foreign(DarwinSchedule.rid)==DarwinScheduleLocation.rid", order_by="DarwinScheduleLocation.index")
 
     origins_rel = relationship("DarwinScheduleLocation", uselist=True, lazy="joined", primaryjoin="and_(foreign(DarwinSchedule.rid)==DarwinScheduleLocation.rid, DarwinScheduleLocation.loc_type.like('%OR'))")
     destinations_rel = relationship("DarwinScheduleLocation", uselist=True, lazy="joined", primaryjoin="and_(foreign(DarwinSchedule.rid)==DarwinScheduleLocation.rid, DarwinScheduleLocation.loc_type.like('%DT'))")
@@ -120,7 +120,7 @@ class DarwinSchedule(Base):
 
     def serialise(self, recurse):
         """For JSONification. Recurse - if set to True, will include all calling locations"""
-        return OrderedDict([
+        out = OrderedDict([
             ("uid", self.uid),
             ("ssd", self.ssd),
             ("rid", self.rid),
@@ -129,19 +129,24 @@ class DarwinSchedule(Base):
             ("is_active", self.is_active),
             ("is_charter", self.is_charter),
             ("is_passenger", self.is_passenger),
-            ("origins", [a.serialise(False) for a in self.get_origins()]),
-            ("destinations", [a.serialise(False) for a in self.get_destinations()]),
+            ("origins", [a.serialise(False, c) for c, a in self.get_origins()]),
+            ("destinations", [a.serialise(False, c) for c, a in self.get_destinations()]),
             ("delay_reason", self.delay_reason),
             ("cancel_reason", self.cancel_reason),
         ])
 
-    # TODO: These need to offer the source of the location
+        if recurse:
+            out["locations"] = [a.serialise(False) for a in self.locations]
+        return out
+
 
     def get_origins(self):
-        return self.origins_rel + [b for a in self.associated_from for b in a.main_schedule.origins_rel]
+        sc_orig = self.origins_rel
+        return list(zip(len(sc_orig)*["SC"], sc_orig)) + [(a.category, b) for a in self.associated_from for b in a.main_schedule.origins_rel if a.category != "NP"]
 
     def get_destinations(self):
-        return self.destinations_rel + [b for a in self.associated_to for b in a.assoc_schedule.destinations_rel]
+        sc_dest = self.destinations_rel
+        return list(zip(len(sc_dest)*["SC"], sc_dest)) + [(a.category, b) for a in self.associated_to for b in a.assoc_schedule.destinations_rel if a.category != "NP"]
 
 
 class DarwinScheduleLocation(Base):
@@ -200,11 +205,12 @@ class DarwinScheduleLocation(Base):
     def __repr__(self):
         return "<DarwinScheduleLocation {}/{}/{} wta {} wtd {} s {} f - t ->".format(self.rid, self.tiploc, self.index, self.wta, self.wtd, self.status)
 
-    def serialise(self, recurse: bool):
+    def serialise(self, recurse: bool, source: str = "SC"):
         """Serialises this as a dict for presumed JSON. If recurse is set, will be enveloped by schedule"""
         # TODO: enveloping is the old paradigm, but *is it a good one*? Semantically it doesn't make so much sense now
         here = OrderedDict([
             ("type", self.loc_type),
+            ("source", source),
             ("activity", self.activity),
             ("cancelled", self.cancelled),
             ("length", self.status.length),
