@@ -278,7 +278,7 @@ class DarwinAssociation(Base):
 class DarwinScheduleStatus(Base):
     __tablename__ = "darwin_schedule_status"
     __table_args__ = (
-        ForeignKeyConstraint(("rid", "original_wt"), ("darwin_schedule_locations.rid", "darwin_schedule_locations.original_wt"), ondelete="CASCADE"),
+        ForeignKeyConstraint(("rid", "original_wt", "tiploc"), ("darwin_schedule_locations.rid", "darwin_schedule_locations.original_wt", "darwin_schedule_locations.tiploc"), ondelete="CASCADE"),
     )
 
     rid = Column(CHAR(15), ForeignKey("darwin_schedules.rid"), nullable=False, primary_key=True)
