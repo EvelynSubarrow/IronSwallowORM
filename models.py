@@ -1,7 +1,7 @@
 from collections import OrderedDict
 import datetime
 from decimal import Decimal
-from typing import Optional
+from typing import Optional, Tuple, List
 
 import sqlalchemy
 from sqlalchemy.orm import sessionmaker, relationship
@@ -178,8 +178,8 @@ class DarwinScheduleLocation(Base):
 
     status: "DarwinScheduleStatus" = relationship("DarwinScheduleStatus", uselist=False, lazy="joined", innerjoin=True)
 
-    associated_to = relationship("DarwinAssociation", lazy="joined", primaryjoin="and_(foreign(DarwinScheduleLocation.rid)==DarwinAssociation.main_rid, foreign(DarwinScheduleLocation.original_wt)==DarwinAssociation.main_original_wt)")
-    associated_from = relationship("DarwinAssociation", lazy="joined", primaryjoin="and_(foreign(DarwinScheduleLocation.rid)==DarwinAssociation.assoc_rid, foreign(DarwinScheduleLocation.original_wt)==DarwinAssociation.assoc_original_wt)")
+    associated_to = relationship("DarwinAssociation", lazy="joined", uselist=True, primaryjoin="and_(foreign(DarwinScheduleLocation.rid)==DarwinAssociation.main_rid, foreign(DarwinScheduleLocation.original_wt)==DarwinAssociation.main_original_wt)")
+    associated_from = relationship("DarwinAssociation", lazy="joined", uselist=True, primaryjoin="and_(foreign(DarwinScheduleLocation.rid)==DarwinAssociation.assoc_rid, foreign(DarwinScheduleLocation.original_wt)==DarwinAssociation.assoc_original_wt)")
 
 
     def complete_times_dict(self) -> dict:
@@ -204,6 +204,26 @@ class DarwinScheduleLocation(Base):
 
         return out
 
+    def complete_associations(self) -> List[Tuple[bool, "DarwinAssociation"]]:
+        return [(True, a) for a in self.associated_from] + [(False, a) for a in self.associated_to]
+
+    def complete_associations_dict(self):
+        complete_list = self.complete_associations()
+        straightened = []
+        for k, v in complete_list:
+            out = OrderedDict()
+            out["from"] = k
+            out["category"] = v.category
+            if k:
+                out["assoc"] = v.main_schedule_loc.serialise(True, v.category)
+                out["there"] = out["assoc"]["origins"]
+            else:
+                out["assoc"] = v.assoc_schedule_loc.serialise(True, v.category)
+                out["there"] = out["assoc"]["destinations"]
+
+            straightened.append(out)
+        return straightened
+
     def __repr__(self):
         return "<DarwinScheduleLocation {}/{}/{} wta {} wtd {} s {} f - t ->".format(self.rid, self.tiploc, self.index, self.wta, self.wtd, self.status)
 
@@ -223,7 +243,8 @@ class DarwinScheduleLocation(Base):
                 ("cis_suppressed", self.status.plat_cis_suppressed),
                 ("confirmed", self.status.plat_confirmed),
                 ("source", self.status.plat_source)
-                ]))
+                ])),
+            ("associations", self.complete_associations_dict() if source == "SC" else [])
             ])
         here.update(self.location.serialise(True))
 
@@ -256,7 +277,7 @@ class DarwinAssociation(Base):
         (main_rid, main_original_wt),
         ("darwin_schedule_locations.rid", "darwin_schedule_locations.original_wt")
     )
-    main_schedule_loc = relationship("DarwinScheduleLocation", foreign_keys=(main_rid,main_original_wt), viewonly=True)
+    main_schedule_loc = relationship("DarwinScheduleLocation", foreign_keys=(main_rid, main_original_wt), viewonly=True)
 
     # associated
 
@@ -272,7 +293,7 @@ class DarwinAssociation(Base):
         (assoc_rid, assoc_original_wt),
         ("darwin_schedule_locations.rid", "darwin_schedule_locations.original_wt")
     )
-    assoc_schedule_loc = relationship("DarwinScheduleLocation", foreign_keys=(main_rid, main_original_wt), viewonly=True)
+    assoc_schedule_loc = relationship("DarwinScheduleLocation", foreign_keys=(assoc_rid, assoc_original_wt), viewonly=True)
 
 
 class DarwinScheduleStatus(Base):
