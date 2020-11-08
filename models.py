@@ -131,8 +131,8 @@ class DarwinSchedule(Base):
             ("is_active", self.is_active),
             ("is_charter", self.is_charter),
             ("is_passenger", self.is_passenger),
-            ("origins", [a.serialise(False, c) for c, a in self.get_origins()]),
-            ("destinations", [a.serialise(False, c) for c, a in self.get_destinations()]),
+            ("origins", [a.serialise(False, c, limit_associations=True) for c, a in self.get_origins()]),
+            ("destinations", [a.serialise(False, c, limit_associations=True) for c, a in self.get_destinations()]),
             ("delay_reason", self.delay_reason),
             ("cancel_reason", self.cancel_reason),
         ])
@@ -142,11 +142,11 @@ class DarwinSchedule(Base):
         return out
 
 
-    def get_origins(self):
+    def get_origins(self) -> List[Tuple[str, "DarwinScheduleLocation"]]:
         sc_orig = self.origins_rel
         return list(zip(len(sc_orig)*["SC"], sc_orig)) + [(a.category, b) for a in self.associated_from for b in a.main_schedule.origins_rel if a.category != "NP"]
 
-    def get_destinations(self):
+    def get_destinations(self) -> List[Tuple[str, "DarwinScheduleLocation"]]:
         sc_dest = self.destinations_rel
         return list(zip(len(sc_dest)*["SC"], sc_dest)) + [(a.category, b) for a in self.associated_to for b in a.assoc_schedule.destinations_rel if a.category != "NP"]
 
@@ -227,7 +227,7 @@ class DarwinScheduleLocation(Base):
     def __repr__(self):
         return "<DarwinScheduleLocation {}/{}/{} wta {} wtd {} s {} f - t ->".format(self.rid, self.tiploc, self.index, self.wta, self.wtd, self.status)
 
-    def serialise(self, recurse: bool, source: str = "SC"):
+    def serialise(self, recurse: bool, source: str = "SC", limit_associations=False):
         """Serialises this as a dict for presumed JSON. If recurse is set, will be enveloped by schedule"""
         # TODO: enveloping is the old paradigm, but *is it a good one*? Semantically it doesn't make so much sense now
         here = OrderedDict([
@@ -244,7 +244,7 @@ class DarwinScheduleLocation(Base):
                 ("confirmed", self.status.plat_confirmed),
                 ("source", self.status.plat_source)
                 ])),
-            ("associations", self.complete_associations_dict() if source == "SC" else [])
+            ("associations", self.complete_associations_dict() if source == "SC" and not limit_associations else [])
             ])
         here.update(self.location.serialise(True))
 
