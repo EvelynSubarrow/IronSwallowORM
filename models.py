@@ -34,6 +34,8 @@ def _combine_darwin_time(working_time, darwin_time) -> datetime.datetime:
 
 Base = declarative_base()
 
+def create_all(engine):
+    Base.metadata.create_all(engine)
 
 class DarwinOperator(Base):
     __tablename__ = "darwin_operators"
@@ -47,8 +49,12 @@ class DarwinOperator(Base):
 
 class DarwinReason(Base):
     __tablename__ = "darwin_reasons"
-    id = Column(SMALLINT, unique=True, primary_key=True, index=True)
-    type = Column(CHAR(1), unique=True, primary_key=True)
+    __table_args__ = (
+        UniqueConstraint("id", "type"),
+    )
+
+    id = Column(SMALLINT, primary_key=True, index=True)
+    type = Column(CHAR(1), primary_key=True)
     message = Column(VARCHAR)
 
     def __repr__(self):
@@ -79,6 +85,9 @@ class DarwinLocation(Base):
 
 class DarwinSchedule(Base):
     __tablename__ = "darwin_schedules"
+    __table_args__ = (
+        UniqueConstraint("uid", "ssd"),
+    )
     uid = Column(VARCHAR(7), nullable=False, index=True)
     rid = Column(CHAR(15), nullable=False, primary_key=True, unique=True, index=True)
     rsid = Column(CHAR(8))
@@ -96,13 +105,11 @@ class DarwinSchedule(Base):
     is_deleted = Column(BOOLEAN, nullable=False, default=False)
     is_passenger = Column(BOOLEAN, nullable=False, default=False)
 
-    origins = Column(JSON, nullable=False)
-    destinations = Column(JSON, nullable=False)
+    origins = Column(ARRAY(JSON), nullable=False)
+    destinations = Column(ARRAY(JSON), nullable=False)
 
     delay_reason = Column(JSON, default=None)
     cancel_reason = Column(JSON, default=None)
-
-    uid_ssd_unique_constraint = UniqueConstraint("uid", "ssd")
 
     locations = relationship("DarwinScheduleLocation", lazy="select", uselist=True, primaryjoin="foreign(DarwinSchedule.rid)==DarwinScheduleLocation.rid", order_by="DarwinScheduleLocation.index")
 
@@ -153,6 +160,9 @@ class DarwinSchedule(Base):
 
 class DarwinScheduleLocation(Base):
     __tablename__ = "darwin_schedule_locations"
+    __table_args__ = (
+        UniqueConstraint("rid", "original_wt", "tiploc"),
+    )
 
     rid = Column(CHAR(15), ForeignKey("darwin_schedules.rid"), nullable=False, primary_key=True)
     rid_constraint = ForeignKeyConstraint(("rid",), ("darwin_schedules.rid",), ondelete="CASCADE")
@@ -180,7 +190,6 @@ class DarwinScheduleLocation(Base):
 
     associated_to = relationship("DarwinAssociation", lazy="joined", uselist=True, primaryjoin="and_(foreign(DarwinScheduleLocation.rid)==DarwinAssociation.main_rid, foreign(DarwinScheduleLocation.original_wt)==DarwinAssociation.main_original_wt)")
     associated_from = relationship("DarwinAssociation", lazy="joined", uselist=True, primaryjoin="and_(foreign(DarwinScheduleLocation.rid)==DarwinAssociation.assoc_rid, foreign(DarwinScheduleLocation.original_wt)==DarwinAssociation.assoc_original_wt)")
-
 
     def complete_times_dict(self) -> dict:
         out = OrderedDict()
@@ -258,9 +267,13 @@ class DarwinScheduleLocation(Base):
 
 class DarwinAssociation(Base):
     __tablename__ = "darwin_associations"
+    __table_args__ = (
+        UniqueConstraint("main_rid", "main_original_wt", "tiploc"),
+        UniqueConstraint("assoc_rid", "assoc_original_wt", "tiploc"),
+    )
 
     category = Column(CHAR(2), nullable=False)
-    tiploc = Column(VARCHAR(3), ForeignKey("darwin_locations.tiploc"), nullable=False, index=True, primary_key=True)
+    tiploc = Column(VARCHAR(7), ForeignKey("darwin_locations.tiploc"), nullable=False, index=True, primary_key=True)
     location = relationship("DarwinLocation", uselist=False, lazy="select")
 
     # main
@@ -268,41 +281,41 @@ class DarwinAssociation(Base):
     main_rid = Column(CHAR(15), ForeignKey("darwin_schedules.rid"), nullable=False, index=True, primary_key=True)
     main_rid_constraint = ForeignKeyConstraint(("main_rid",), ("darwin_schedules.rid",), ondelete="CASCADE")
     main_original_wt = Column(VARCHAR(18), nullable=False, index=True, primary_key=True)
-    unique_main_rid_owt = UniqueConstraint("main_rid", "main_original_wt")
+
 
     main_schedule = relationship("DarwinSchedule", foreign_keys=(main_rid,), uselist=False)
 
     # TODO: foreign key tomfuckery
     fkey_main_schedule_loc = ForeignKeyConstraint(
-        (main_rid, main_original_wt),
-        ("darwin_schedule_locations.rid", "darwin_schedule_locations.original_wt")
+        (main_rid, main_original_wt, tiploc),
+        ("darwin_schedule_locations.rid", "darwin_schedule_locations.original_wt", "darwin_schedule_locations.tiploc")
     )
-    main_schedule_loc = relationship("DarwinScheduleLocation", foreign_keys=(main_rid, main_original_wt), viewonly=True)
+    main_schedule_loc = relationship("DarwinScheduleLocation", foreign_keys=(main_rid, main_original_wt, tiploc), viewonly=True)
 
     # associated
 
     assoc_rid = Column(CHAR(15), ForeignKey("darwin_schedules.rid"), nullable=False, index=True, primary_key=True)
     assoc_rid_constraint = ForeignKeyConstraint(("rid",), ("darwin_schedules.rid",), ondelete="CASCADE")
-    assoc_original_wt = Column(VARCHAR(13), nullable=False, index=True, primary_key=True)
-    unique_assoc_rid_owt = UniqueConstraint("assoc_rid", "assoc_original_wt")
+    assoc_original_wt = Column(VARCHAR(18), nullable=False, index=True, primary_key=True)
 
     assoc_schedule = relationship("DarwinSchedule", foreign_keys=(assoc_rid,), uselist=False)
 
     # TODO: more foreign key tomfuckery
     fkey_assoc_schedule_loc = ForeignKeyConstraint(
-        (assoc_rid, assoc_original_wt),
-        ("darwin_schedule_locations.rid", "darwin_schedule_locations.original_wt")
+        (assoc_rid, assoc_original_wt, tiploc),
+        ("darwin_schedule_locations.rid", "darwin_schedule_locations.original_wt", "darwin_schedule_locations.tiploc")
     )
-    assoc_schedule_loc = relationship("DarwinScheduleLocation", foreign_keys=(assoc_rid, assoc_original_wt), viewonly=True)
+    assoc_schedule_loc = relationship("DarwinScheduleLocation", foreign_keys=(assoc_rid, assoc_original_wt, tiploc), viewonly=True)
 
 
 class DarwinScheduleStatus(Base):
     __tablename__ = "darwin_schedule_status"
     __table_args__ = (
-        ForeignKeyConstraint(("rid", "original_wt", "tiploc"), ("darwin_schedule_locations.rid", "darwin_schedule_locations.original_wt", "darwin_schedule_locations.tiploc"), ondelete="CASCADE"),
+        #ForeignKeyConstraint(("rid", "original_wt", "tiploc"), ("darwin_schedule_locations.rid", "darwin_schedule_locations.original_wt", "darwin_schedule_locations.tiploc"), ondelete="CASCADE"),
+        UniqueConstraint("rid", "tiploc", "original_wt"),
     )
 
-    rid = Column(CHAR(15), ForeignKey("darwin_schedules.rid"), nullable=False, primary_key=True)
+    rid = Column(CHAR(15), nullable=False, primary_key=True) # Technically a schedule ref but putting it as a foreign key screws everything up sorry
     tiploc = Column(VARCHAR(7), ForeignKey("darwin_locations.tiploc"), index=True, primary_key=True)
     location = relationship("DarwinLocation", uselist=False)
     original_wt = Column(VARCHAR(18), index=True, primary_key=True)
@@ -331,10 +344,7 @@ class DarwinScheduleStatus(Base):
 
     length = Column(SMALLINT)
 
-    schedule_location = relationship("DarwinScheduleLocation", back_populates="status")
-
-    UniqueConstraint("rid", "tiploc", "original_wt")
-
+    #schedule_location = relationship("DarwinScheduleLocation", back_populates="status")
 
     def format_platform(self):
         return ("*"*self.plat_suppressed) + (self.plat or ' ') + ("." * self.plat_confirmed)
