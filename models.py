@@ -186,7 +186,11 @@ class DarwinScheduleLocation(Base):
     cancelled = Column(BOOLEAN, nullable=False, default=False)
     rdelay = Column(SMALLINT, nullable=False, default=0)
 
-    status: "DarwinScheduleStatus" = relationship("DarwinScheduleStatus", uselist=False, lazy="joined", innerjoin=True)
+    status: "DarwinScheduleStatus" = relationship("DarwinScheduleStatus", uselist=False, lazy="joined", primaryjoin="""and_(
+        foreign(DarwinScheduleLocation.rid)==DarwinScheduleStatus.rid,
+        foreign(DarwinScheduleLocation.original_wt)==DarwinScheduleStatus.original_wt,
+        foreign(DarwinScheduleLocation.tiploc)==DarwinScheduleStatus.tiploc
+        )""", innerjoin=True)
 
     associated_to = relationship("DarwinAssociation", lazy="joined", uselist=True, primaryjoin="and_(foreign(DarwinScheduleLocation.rid)==DarwinAssociation.main_rid, foreign(DarwinScheduleLocation.original_wt)==DarwinAssociation.main_original_wt)")
     associated_from = relationship("DarwinAssociation", lazy="joined", uselist=True, primaryjoin="and_(foreign(DarwinScheduleLocation.rid)==DarwinAssociation.assoc_rid, foreign(DarwinScheduleLocation.original_wt)==DarwinAssociation.assoc_original_wt)")
