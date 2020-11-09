@@ -291,9 +291,10 @@ class DarwinAssociation(Base):
     # TODO: foreign key tomfuckery
     fkey_main_schedule_loc = ForeignKeyConstraint(
         (main_rid, main_original_wt, tiploc),
-        ("darwin_schedule_locations.rid", "darwin_schedule_locations.original_wt", "darwin_schedule_locations.tiploc")
+        ("darwin_schedule_locations.rid", "darwin_schedule_locations.original_wt", "darwin_schedule_locations.tiploc"), ondelete="CASCADE"
     )
     main_schedule_loc = relationship("DarwinScheduleLocation", foreign_keys=(main_rid, main_original_wt, tiploc), viewonly=True)
+
 
     # associated
 
@@ -306,7 +307,7 @@ class DarwinAssociation(Base):
     # TODO: more foreign key tomfuckery
     fkey_assoc_schedule_loc = ForeignKeyConstraint(
         (assoc_rid, assoc_original_wt, tiploc),
-        ("darwin_schedule_locations.rid", "darwin_schedule_locations.original_wt", "darwin_schedule_locations.tiploc")
+        ("darwin_schedule_locations.rid", "darwin_schedule_locations.original_wt", "darwin_schedule_locations.tiploc"), ondelete="CASCADE"
     )
     assoc_schedule_loc = relationship("DarwinScheduleLocation", foreign_keys=(assoc_rid, assoc_original_wt, tiploc), viewonly=True)
 
