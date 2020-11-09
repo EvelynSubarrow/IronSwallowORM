@@ -272,8 +272,7 @@ class DarwinScheduleLocation(Base):
 class DarwinAssociation(Base):
     __tablename__ = "darwin_associations"
     __table_args__ = (
-        UniqueConstraint("main_rid", "main_original_wt", "tiploc"),
-        UniqueConstraint("assoc_rid", "assoc_original_wt", "tiploc"),
+        UniqueConstraint("main_rid", "assoc_rid", "tiploc"),
     )
 
     category = Column(CHAR(2), nullable=False)
@@ -299,7 +298,7 @@ class DarwinAssociation(Base):
     # associated
 
     assoc_rid = Column(CHAR(15), ForeignKey("darwin_schedules.rid"), nullable=False, index=True, primary_key=True)
-    assoc_rid_constraint = ForeignKeyConstraint(("rid",), ("darwin_schedules.rid",), ondelete="CASCADE")
+    assoc_rid_constraint = ForeignKeyConstraint(("assoc_rid",), ("darwin_schedules.rid",), ondelete="CASCADE")
     assoc_original_wt = Column(VARCHAR(18), nullable=False, index=True, primary_key=True)
 
     assoc_schedule = relationship("DarwinSchedule", foreign_keys=(assoc_rid,), uselist=False)
