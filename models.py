@@ -70,6 +70,9 @@ class DarwinLocation(Base):
     name_short = Column(VARCHAR)
     name_full = Column(VARCHAR)
     dict_values = Column(JSON, name="dict")
+    category = Column(CHAR(1))
+    name_darwin = Column(VARCHAR)
+    name_corpus = Column(VARCHAR)
 
     def __repr__(self):
         return "<DarwinLocation {} - {}>".format(self.tiploc, self.name_short)
