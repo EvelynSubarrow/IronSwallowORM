@@ -108,6 +108,7 @@ class DarwinLocation(Base):
     def serialise(self, short=True):
         return OrderedDict([
             ("tiploc", self.tiploc),
+            ("location_category", self.category),
             ("crs_darwin", self.crs_darwin),
             ("name_short", self.name_short),
             ("name_full", self.name_full),
