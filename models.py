@@ -37,6 +37,28 @@ Base = declarative_base()
 def create_all(engine):
     Base.metadata.create_all(engine)
 
+
+class BPlanNetworkLink(Base):
+    __table_name__ = "bplan_network_links"
+    origin = Column(VARCHAR(7), nullable=False, primary_key=True)
+    destination = Column(VARCHAR(7), nullable=False, primary_key=True)
+    running_line_code = Column(VARCHAR(3), nullable=False, primary_key=True)
+    running_line_desc = Column(VARCHAR(20))
+    start_date = Column(DATE, nullable=True)
+    end_date = Column(DATE, nullable=True)
+    initial_direction = Column(CHAR, nullable=False)
+    final_direction = Column(CHAR, nullable=False)
+    distance = Column(INTEGER, nullable=True)
+    doo_passenger = Column(BOOLEAN, nullable=False)
+    doo_non_passenger = Column(BOOLEAN, nullable=False)
+    retb = Column(BOOLEAN, nullable=False)
+    zone = Column(VARCHAR, nullable=False)
+    reversible = Column(CHAR, nullable=False)
+    power = Column(CHAR, nullable=False)
+    route_allowance = Column(INTEGER, nullable=False)
+
+
+
 class DarwinOperator(Base):
     __tablename__ = "darwin_operators"
 
