@@ -96,6 +96,12 @@ class DarwinLocation(Base):
     name_darwin = Column(VARCHAR)
     name_corpus = Column(VARCHAR)
 
+    lines = relationship(BPlanNetworkLink, uselist=True, lazy="select", primaryjoin="""or_(
+    foreign(DarwinLocation.tiploc)==BPlanNetworkLink.origin,
+    and_(foreign(DarwinLocation.tiploc)==BPlanNetworkLink.destination, BPlanNetworkLink.reversible.in_(['B', 'R']))
+    )""")
+
+
     def __repr__(self):
         return "<DarwinLocation {} - {}>".format(self.tiploc, self.name_short)
 
