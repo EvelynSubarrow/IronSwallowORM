@@ -39,7 +39,7 @@ def create_all(engine):
 
 
 class BPlanNetworkLink(Base):
-    __table_name__ = "bplan_network_links"
+    __tablename__ = "bplan_network_links"
     origin = Column(VARCHAR(7), nullable=False, primary_key=True)
     destination = Column(VARCHAR(7), nullable=False, primary_key=True)
     running_line_code = Column(VARCHAR(3), nullable=False, primary_key=True)
