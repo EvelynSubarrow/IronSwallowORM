@@ -131,6 +131,8 @@ class DarwinLocation(Base):
     and_(foreign(DarwinLocation.tiploc)==BPlanNetworkLink.destination, BPlanNetworkLink.reversible.in_(['B', 'R']))
     )""")
 
+    platforms = relationship(BPlanPlatform, uselist=True, lazy="select", primaryjoin="foreign(DarwinLocation.tiploc)==BPlanPlatform.tiploc", order_by="asc(BPlanPlatform.platform)")
+
 
     def __repr__(self):
         return "<DarwinLocation {} - {}>".format(self.tiploc, self.name_short)
