@@ -46,6 +46,15 @@ class SwallowDebug(Base):
     updated_at = Column(TIMESTAMP, nullable=False)
     content = Column(VARCHAR, nullable=True)
 
+    def serialise(self):
+        return OrderedDict([
+            ("subsystem", self.subsystem),
+            ("subkey", self.subkey),
+            ("disambiguation", self.disambiguation),
+            ("updated_at", self.updated_at),
+            ("content", self.content)
+        ])
+
 
 class BPlanNetworkLink(Base):
     __tablename__ = "bplan_network_links"
