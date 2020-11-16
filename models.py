@@ -38,6 +38,15 @@ def create_all(engine):
     Base.metadata.create_all(engine)
 
 
+class SwallowDebug(Base):
+    __tablename__ = "swallow_debug"
+    subsystem = Column(VARCHAR(4), primary_key=True)
+    subkey = Column(VARCHAR, primary_key=True)
+    disambiguation = Column(VARCHAR, primary_key=True)
+    updated_at = Column(TIMESTAMP, nullable=False)
+    content = Column(VARCHAR, nullable=True)
+
+
 class BPlanNetworkLink(Base):
     __tablename__ = "bplan_network_links"
     origin = Column(VARCHAR(7), nullable=False, primary_key=True)
