@@ -76,6 +76,18 @@ class BPlanNetworkLink(Base):
     route_allowance = Column(INTEGER, nullable=False)
 
 
+class BPlanPlatform(Base):
+    __tablename__ = "bplan_platforms"
+    tiploc = Column(VARCHAR(7), primary_key=True)
+    platform = Column(VARCHAR(3), primary_key=True)
+    start_date = Column(DATE, nullable=True)
+    end_date = Column(DATE, nullable=True)
+    length = Column(INTEGER, nullable=True)
+    power = Column(CHAR, nullable=False)
+    doo_passenger = Column(BOOLEAN, nullable=False)
+    doo_non_passenger = Column(BOOLEAN, nullable=False)
+
+
 
 class DarwinOperator(Base):
     __tablename__ = "darwin_operators"
