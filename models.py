@@ -64,6 +64,7 @@ class LocalisedReference(Base):
     code = Column(VARCHAR, primary_key=True)
     description = Column(VARCHAR)
 
+
 class BPlanNetworkLink(Base):
     __tablename__ = "bplan_network_links"
     origin = Column(VARCHAR(7), nullable=False, primary_key=True)
@@ -112,6 +113,8 @@ class DarwinOperator(Base):
             return "C"
         elif self.operator in ["TW", "LT", "SJ"]:
             return "M"
+        elif self.operator in ["ZB", "ZF"]:
+            return "O"
         return "S"
 
     def __repr__(self):
