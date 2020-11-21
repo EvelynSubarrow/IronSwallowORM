@@ -104,18 +104,7 @@ class DarwinOperator(Base):
     operator = Column(CHAR(2), primary_key=True, unique=True, index=True)
     operator_name = Column(VARCHAR)
     url = Column(VARCHAR)
-
-    # TODO: best practice dictates this would actually form part of the DB itself, but that means MIGRATION!
-    # TODO: and going through all that for this is probably not worth it
-    # TODO: in short, save this for when the DB tables actually need major restructuring
-    def category(self):
-        if self.operator in ["NY", "PC", "WR", "ZM"]:
-            return "C"
-        elif self.operator in ["TW", "LT", "SJ"]:
-            return "M"
-        elif self.operator in ["ZB", "ZF"]:
-            return "O"
-        return "S"
+    category = Column(CHAR(1), default=None)
 
     def __repr__(self):
         return "<DarwinOperator {} - {}>".format(self.operator, self.operator_name)
