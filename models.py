@@ -97,7 +97,6 @@ class BPlanPlatform(Base):
     doo_non_passenger = Column(BOOLEAN, nullable=False)
 
 
-
 class DarwinOperator(Base):
     __tablename__ = "darwin_operators"
 
@@ -135,6 +134,7 @@ class DarwinLocation(Base):
     category = Column(CHAR(1))
     name_darwin = Column(VARCHAR)
     name_corpus = Column(VARCHAR)
+    name_bplan = Column(VARCHAR)
 
     lines = relationship(BPlanNetworkLink, uselist=True, lazy="select", primaryjoin="""or_(
     foreign(DarwinLocation.tiploc)==BPlanNetworkLink.origin,
