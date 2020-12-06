@@ -431,6 +431,16 @@ class DarwinScheduleStatus(Base):
         return "<DarwinScheduleStatus {}>".format(self.format_platform())
 
 
+class DarwinScheduleFormation(Base):
+    __tablename__ = "darwin_formations"
+    rid = Column(CHAR(15), nullable=False, primary_key=True, index=True)
+    fid = Column(CHAR(19), nullable=False, primary_key=True, index=True)
+    coach_number = Column(VARCHAR, nullable=False, primary_key=True)
+    coach_class = Column(VARCHAR, nullable=False)
+    toilet_status = Column(VARCHAR, nullable=False)
+    toilet_type = Column(VARCHAR, nullable=False)
+
+
 class DarwinMessage(Base):
     __tablename__ = "darwin_messages"
     message_id = Column(INTEGER, nullable=False, primary_key=True, unique=True, index=True)
