@@ -148,13 +148,18 @@ class DarwinLocation(Base):
         return "<DarwinLocation {} - {}>".format(self.tiploc, self.name_short)
 
     def serialise(self, short=True):
-        return OrderedDict([
+        out = OrderedDict([
             ("tiploc", self.tiploc),
             ("location_category", self.category),
             ("crs_darwin", self.crs_darwin),
             ("name_short", self.name_short),
             ("name_full", self.name_full),
         ])
+        if not short:
+            out.update(OrderedDict([
+
+            ]))
+        return out
 
 
 class DarwinSchedule(Base):
@@ -437,7 +442,7 @@ class DarwinScheduleFormation(Base):
     fid = Column(CHAR(19), nullable=False, primary_key=True, index=True)
     coach_number = Column(VARCHAR, nullable=False, primary_key=True)
     coach_class = Column(VARCHAR, nullable=False)
-    toilet_status = Column(VARCHAR, nullable=False)
+    toilet_status = Column(VARCHAR, nullable=True)
     toilet_type = Column(VARCHAR, nullable=False)
 
 
