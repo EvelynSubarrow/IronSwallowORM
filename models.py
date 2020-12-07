@@ -440,6 +440,7 @@ class DarwinScheduleFormation(Base):
     __tablename__ = "darwin_formations"
     rid = Column(CHAR(15), nullable=False, primary_key=True, index=True)
     fid = Column(CHAR(19), nullable=False, primary_key=True, index=True)
+    seq = Column(SMALLINT, nullable=False, index=True)
     coach_number = Column(VARCHAR, nullable=False, primary_key=True)
     coach_class = Column(VARCHAR, nullable=False)
     toilet_status = Column(VARCHAR, nullable=True)
