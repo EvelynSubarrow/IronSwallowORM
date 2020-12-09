@@ -202,7 +202,7 @@ class DarwinSchedule(Base):
     associated_to = relationship("DarwinAssociation", uselist=True, lazy="joined", primaryjoin="foreign(DarwinSchedule.rid)==DarwinAssociation.main_rid")
     associated_from = relationship("DarwinAssociation", uselist=True, lazy="joined", primaryjoin="foreign(DarwinSchedule.rid)==DarwinAssociation.assoc_rid")
 
-    formation = relationship("DarwinScheduleFormation", uselist=True, lazy="select", primaryjoin="foreign(DarwinSchedule.rid)==DarwinScheduleFormation.rid")
+    formation = relationship("DarwinScheduleFormation", uselist=True, lazy="select", primaryjoin="foreign(DarwinSchedule.rid)==DarwinScheduleFormation.rid", order_by="DarwinScheduleFormation.seq")
 
     def __repr__(self):
         return "{}/{} (r. {} rs. {}) {}".format(self.ssd, self.uid, self.rid, self.rid, self.rsid, self.operator_id)
