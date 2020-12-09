@@ -190,6 +190,9 @@ class DarwinSchedule(Base):
     delay_reason = Column(JSON, default=None)
     cancel_reason = Column(JSON, default=None)
 
+    formation_summary = Column(VARCHAR, default=None)
+    best_toilet_type = Column(VARCHAR, default=None)
+
     locations = relationship("DarwinScheduleLocation", lazy="select", uselist=True, primaryjoin="foreign(DarwinSchedule.rid)==DarwinScheduleLocation.rid", order_by="DarwinScheduleLocation.index")
 
     origins_rel = relationship("DarwinScheduleLocation", uselist=True, lazy="joined", primaryjoin="and_(foreign(DarwinSchedule.rid)==DarwinScheduleLocation.rid, DarwinScheduleLocation.loc_type.like('%OR'))")
@@ -199,6 +202,7 @@ class DarwinSchedule(Base):
     associated_to = relationship("DarwinAssociation", uselist=True, lazy="joined", primaryjoin="foreign(DarwinSchedule.rid)==DarwinAssociation.main_rid")
     associated_from = relationship("DarwinAssociation", uselist=True, lazy="joined", primaryjoin="foreign(DarwinSchedule.rid)==DarwinAssociation.assoc_rid")
 
+    formation = relationship("DarwinScheduleFormation", uselist=True, lazy="select", primaryjoin="foreign(DarwinSchedule.rid)==DarwinScheduleFormation.rid")
 
     def __repr__(self):
         return "{}/{} (r. {} rs. {}) {}".format(self.ssd, self.uid, self.rid, self.rid, self.rsid, self.operator_id)
