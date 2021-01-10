@@ -225,9 +225,11 @@ class DarwinSchedule(Base):
             ("destinations", [a.serialise(False, c, limit_associations=True) for c, a in self.get_destinations()]),
             ("delay_reason", self.delay_reason),
             ("cancel_reason", self.cancel_reason),
+            ("formation_summary", self.formation_summary)
         ])
 
         if recurse:
+            out["formation"] = [a.serialise() for a in self.formation]
             out["locations"] = [a.serialise(False) for a in self.locations]
         return out
 
@@ -449,6 +451,15 @@ class DarwinScheduleFormation(Base):
     coach_class = Column(VARCHAR, nullable=False)
     toilet_status = Column(VARCHAR, nullable=True)
     toilet_type = Column(VARCHAR, nullable=False)
+
+    def serialise(self):
+        return OrderedDict([
+            ("sequence", self.seq),
+            ("coach_number", self.coach_number),
+            ("coach_class", self.coach_class),
+            ("toilet_status", self.toilet_status),
+            ("toilet_type", self.toilet_type)
+        ])
 
 
 class DarwinMessage(Base):
